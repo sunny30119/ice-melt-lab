@@ -2,7 +2,7 @@
 
 ## 1. 專案基本資料
 - 專案名稱：冰塊融化實驗室（ice-melt-lab）
-- 線上網址：https://sunny30119.github.io/ice-melt-lab/（尚未發布）
+- 線上網址：https://sunny30119.github.io/ice-melt-lab/（2026-10-29 上線）
 - 教學對象：國中理化浮力單元（含資優班）
 - 使用情境：課堂投影＋學生平板
 
