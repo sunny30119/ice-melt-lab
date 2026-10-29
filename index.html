@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>冰塊融化實驗室</title>
+<style>
+  /* ====== 基礎樣式（沿用 teaching-web-template） ====== */
+  :root {
+    --primary: #1565C0;
+    --accent:  #E65100;
+    --bg:      #F5F7FA;
+    --card:    #FFFFFF;
+    --ok:      #2E7D32;
+    --bad:     #C62828;
+    --ink:     #1F2933;
+    --muted:   #607D8B;
+    --give:    #EF6C00;   /* 冰讓出的空間 */
+    --fill:    #1E88E5;   /* 融水補進來 */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  header {
+    background: var(--primary); color: #fff; padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 22px; margin: 0; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs button {
+    border: none; border-radius: 6px; padding: 8px 16px; font-size: 16px;
+    cursor: pointer; background: rgba(255,255,255,.2); color: #fff;
+  }
+  .tabs button.active { background: #fff; color: var(--primary); font-weight: bold; }
+  main { padding: 16px; max-width: 1240px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card {
+    background: var(--card); border-radius: 10px; padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12); margin-bottom: 16px;
+  }
+  .card h2 { font-size: 18px; margin: 0 0 10px; }
+  .btn {
+    border: none; border-radius: 8px; padding: 10px 18px; font-size: 16px;
+    background: var(--primary); color: #fff; cursor: pointer; margin-right: 8px;
+  }
+  .btn.secondary { background: #607D8B; }
+
+  /* ====== 控制列 ====== */
+  .controls { display: grid; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .row > .lab { font-weight: bold; min-width: 5.5em; }
+  .seg button {
+    border: 2px solid #CFD8DC; background: #fff; border-radius: 8px;
+    padding: 7px 12px; font-size: 15px; cursor: pointer; color: var(--ink);
+  }
+  .seg button.on { border-color: var(--primary); background: #E3F2FD; font-weight: bold; }
+  .preset button { border-color: #FFCC80; }
+  .preset button.on { border-color: var(--accent); background: #FFF3E0; }
+  input[type=range] { flex: 1; min-width: 160px; accent-color: var(--primary); height: 28px; }
+  .pct { font-size: 20px; font-weight: bold; min-width: 4.2em; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ====== 主版面 ====== */
+  .lab-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 920px) { .lab-grid { grid-template-columns: minmax(0, 1fr); } }
+  .stage-wrap { display: flex; gap: 10px; align-items: stretch; }
+  .beaker-svg { flex: 1; min-width: 0; height: auto; max-height: 560px; }
+  .gauge-svg  { width: 128px; flex: none; height: auto; max-height: 560px; }
+
+  /* 水塊對照 */
+  .blocks-wrap { display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 16px; align-items: center; }
+  @media (max-width: 760px) { .blocks-wrap { grid-template-columns: minmax(0, 1fr); } }
+  #blocks { width: 100%; height: auto; }
+  .hidden-nums .blk-num, .hidden-nums .gauge-val { opacity: 0; }
+  .hidden-nums #blocksText { filter: blur(7px); }
+
+  /* 甲乙丙並排 */
+  .cmp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 920px) { .cmp-grid { grid-template-columns: minmax(0, 1fr); } }
+  .cmp-card h2 { font-size: 17px; }
+  .cmp-card .gauge-svg { width: 84px; }
+  .cmp-card .ledger .bar-row { grid-template-columns: 4.6em 1fr 5em; margin: 4px 0; }
+  .cmp-card .ledger .track { height: 20px; }
+  .cmp-card .predict button { padding: 4px 10px; font-size: 14px; }
+  .cmp-res { font-weight: bold; }
+  .cmp-pick select {
+    flex: 1 1 140px; min-width: 0; font-size: 14px; padding: 6px 8px; border-radius: 8px;
+    border: 2px solid #CFD8DC; background: #fff; color: var(--ink); cursor: pointer;
+  }
+  .cmp-dh { font-size: 17px; margin-top: 4px; }
+
+  /* 學習單 */
+  .ws { font-size: 16px; line-height: 1.6; color: #000; -webkit-user-select: text; user-select: text; }
+  .ws h2 { text-align: center; font-size: 20px; }
+  .ws h3 { margin: 18px 0 6px; font-size: 17px; }
+  .ws table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+  .ws th, .ws td { border: 1px solid #555; padding: 6px 8px; text-align: center; height: 38px; }
+  .ws th { background: #ECEFF1; }
+  .ws td.l { text-align: left; }
+  .ws .ans { display: none; color: #C62828; font-weight: bold; }
+  .ws.show-ans .ans { display: inline; }
+  .ws .line { border-bottom: 1px solid #555; min-height: 36px; padding-top: 6px; }
+  .ws-head { display: flex; justify-content: flex-end; gap: 24px; flex-wrap: wrap; }
+  @media (max-width: 600px) { .ws th, .ws td { padding: 3px; font-size: 12px; } }
+  .state-tag {
+    display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: bold;
+    background: #E8F5E9; color: var(--ok); font-size: 15px;
+  }
+  .state-tag.sink { background: #FFEBEE; color: var(--bad); }
+  .state-tag.mid  { background: #FFF8E1; color: #8D6E00; }
+
+  /* 數值面板 */
+  table.nums { width: 100%; border-collapse: collapse; font-size: 16px; }
+  table.nums td { padding: 6px 4px; border-bottom: 1px solid #ECEFF1; vertical-align: top; }
+  table.nums td.v { text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.nums tr.key td { background: #FFFDE7; }
+  table.nums .hint { display: block; color: var(--muted); font-size: 13px; font-weight: normal; }
+  .big { font-size: 30px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .up   { color: var(--bad); }
+  .down { color: var(--primary); }
+  .same { color: var(--ok); }
+  .hidden-nums .v, .hidden-nums .big, .hidden-nums .ledger-val { filter: blur(7px); }
+
+  /* 體積帳本 */
+  .ledger .bar-row { display: grid; grid-template-columns: 9.5em 1fr 5.6em; align-items: center; gap: 8px; margin: 8px 0; }
+  .ledger .track { background: #ECEFF1; border-radius: 6px; height: 26px; position: relative; overflow: hidden; }
+  .ledger .bar { height: 100%; border-radius: 6px; transition: width .08s linear; }
+  .ledger .ledger-val { text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .ledger .eq { font-size: 17px; line-height: 1.7; margin-top: 6px; }
+  .explain { font-size: 16px; line-height: 1.75; background: #F1F8E9; border-left: 5px solid #7CB342; padding: 10px 14px; border-radius: 6px; }
+  .explain.warn { background: #FFF3E0; border-left-color: var(--give); }
+
+  /* 預測 */
+  .predict button { border-color: #B39DDB; }
+  .predict button.on { border-color: #5E35B1; background: #EDE7F6; }
+  #predictResult { font-weight: bold; font-size: 16px; }
+
+  .note { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  /* ====== 題庫 ====== */
+  .q { margin-bottom: 18px; }
+  .q .stem { font-weight: bold; margin-bottom: 6px; line-height: 1.6; }
+  .q label { display: block; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .q label:hover { background: #EEF3FA; }
+  .q.correct .stem::after { content: "　✔ 答對"; color: var(--ok); }
+  .q.wrong   .stem::after { content: "　✘ 再想想"; color: var(--bad); }
+  .q .exp { display: none; margin-top: 6px; padding: 8px 12px; background: #F5F5F5; border-radius: 6px; line-height: 1.6; }
+  .q.correct .exp, .q.wrong .exp { display: block; }
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    header, .no-print, .panel:not(.active) { display: none !important; }
+    body { background: #fff; }
+    main { padding: 0; max-width: none; }
+    .card { box-shadow: none; padding: 0; }
+    .ws { font-size: 11pt; }
+    .ws th, .ws td { height: 26px; padding: 3px 6px; }
+    .ws h3 { break-after: avoid; }
+    .ws table { break-inside: avoid; }
+    .q label { padding: 2px 0; }
+    .q.correct .stem::after, .q.wrong .stem::after { content: ""; }
+    .q .exp { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧊 冰塊融化，液面會怎樣？</h1>
+  <nav class="tabs">
+    <button class="active" data-tab="lab">融化實驗室</button>
+    <button data-tab="compare">甲乙丙並排</button>
+    <button data-tab="sheet">學習單</button>
+    <button data-tab="quiz">隨堂練習</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ 分頁一：融化實驗室 ============ -->
+  <section class="panel active" id="panel-lab">
+    <div class="card controls">
+      <div class="row preset seg" id="presetRow">
+        <span class="lab">題目情境</span>
+        <button data-preset="甲">甲｜純冰浮在純水</button>
+        <button data-preset="乙">乙｜含石頭的冰浮在純水</button>
+        <button data-preset="丙">丙｜純冰浮在濃鹽水</button>
+      </div>
+      <div class="row seg" id="liqRow"><span class="lab">杯中液體</span></div>
+      <div class="row seg" id="incRow"><span class="lab">冰塊種類</span></div>
+      <div class="row">
+        <span class="lab">融化程度</span>
+        <input type="range" id="melt" min="0" max="1000" value="0" aria-label="融化程度">
+        <span class="pct" id="pct">0%</span>
+      </div>
+      <div class="row no-print">
+        <button class="btn" id="playBtn">▶ 自動融化</button>
+        <button class="btn secondary" id="resetBtn">↺ 回到還沒融化</button>
+        <label style="margin-left:auto;cursor:pointer"><input type="checkbox" id="hideNums"> 先遮住數值（讓學生預測）</label>
+      </div>
+      <div class="row seg predict" id="predictRow">
+        <span class="lab">先預測</span>
+        <span>全部融化後，液面會——</span>
+        <button data-p="1">上升</button>
+        <button data-p="0">不變</button>
+        <button data-p="-1">下降</button>
+        <span id="predictResult"></span>
+      </div>
+    </div>
+
+    <div class="lab-grid" id="labGrid">
+      <!-- 左：燒杯＋放大鏡 -->
+      <div class="card">
+        <h2>燒杯側面圖 <span class="state-tag" id="stateTag">漂浮</span></h2>
+        <div class="stage-wrap">
+          <svg id="beaker" class="beaker-svg" viewBox="0 0 400 540" role="img" aria-label="燒杯中的冰塊"></svg>
+          <svg id="gauge" class="gauge-svg" viewBox="0 0 128 540" role="img" aria-label="液面放大鏡"></svg>
+        </div>
+        <p class="note">右邊「液面放大鏡」把液面的升降放大 30 倍。真實的變化只有零點幾到幾毫米，肉眼在燒杯上幾乎看不出來。<br>斜線區＝冰塊泡在液面下的部分，也就是「排開液體的體積 V排」。</p>
+        <h2 style="margin-top:14px">液面變化 vs 融化程度</h2>
+        <svg id="curve" viewBox="0 0 520 220" style="width:100%;height:auto" role="img" aria-label="液面變化曲線"></svg>
+      </div>
+
+      <!-- 右：數值＋帳本 -->
+      <div>
+        <div class="card ledger">
+          <h2>📒 體積帳本：液面為什麼會變？</h2>
+          <div class="bar-row">
+            <span>① 冰塊讓出的空間<br><small class="note">起始 V排 − 現在 V排</small></span>
+            <div class="track"><div class="bar" id="barGive" style="background:var(--give)"></div></div>
+            <span class="ledger-val" id="valGive">0.0 cm³</span>
+          </div>
+          <div class="bar-row">
+            <span>② 融化的水補進來<br><small class="note">融出的水的體積</small></span>
+            <div class="track"><div class="bar" id="barFill" style="background:var(--fill)"></div></div>
+            <span class="ledger-val" id="valFill">0.0 cm³</span>
+          </div>
+          <div class="eq" id="ledgerEq"></div>
+          <div class="explain" id="explain"></div>
+        </div>
+
+        <div class="card" id="numsCard">
+          <h2>📊 即時數值</h2>
+          <table class="nums" id="nums"></table>
+          <p class="note">設定：燒杯截面積 50 cm²、原有液體 400 cm³、冰 100 g（ρ冰 = 0.92 g/cm³）。<br>
+          假設：不計蒸發與溫度造成的體積變化；融水立刻與水、鹽水均勻混合，混合後體積直接相加；煤油不和水混合，融水會沉到杯底。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⚖️ 融化前後，佔掉的空間比一比 <small class="note">（比的是「全部融化後」）</small></h2>
+      <div class="blocks-wrap">
+        <svg id="blocks" viewBox="0 0 400 290" role="img" aria-label="融化前後體積比較"></svg>
+        <div class="explain" id="blocksText"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 分頁二：甲乙丙並排 ============ -->
+  <section class="panel" id="panel-compare">
+    <div class="card controls">
+      <div class="row">
+        <span class="lab">融化程度</span>
+        <input type="range" id="cmpMelt" min="0" max="1000" value="0" aria-label="三杯融化程度">
+        <span class="pct" id="cmpPct">0%</span>
+      </div>
+      <div class="row no-print">
+        <button class="btn" id="cmpPlay">▶ 三杯一起融化</button>
+        <button class="btn secondary" id="cmpReset">↺ 回到還沒融化</button>
+        <button class="btn secondary" id="cmpDefault">↺ 換回題目的甲乙丙</button>
+        <label style="margin-left:auto;cursor:pointer"><input type="checkbox" id="cmpHide"> 先遮住數值（讓學生預測）</label>
+      </div>
+      <p class="note" style="margin:0">預設是題目的甲、乙、丙。每杯上方的兩個選單可以自己換「液體」和「冰塊種類」，拿任何三種情況來比。三杯都是 100 g 的冰、400 cm³ 的液體、截面積 50 cm² 的燒杯。</p>
+    </div>
+    <div class="cmp-grid" id="cmpGrid"></div>
+  </section>
+
+  <!-- ============ 分頁三：學習單 ============ -->
+  <section class="panel" id="panel-sheet">
+    <div class="card">
+      <div class="row no-print" style="margin-bottom:12px">
+        <button class="btn" onclick="window.print()">🖨 列印學習單</button>
+        <label style="cursor:pointer"><input type="checkbox" id="showAns"> 顯示答案（教師版）</label>
+      </div>
+      <div class="ws" id="ws"></div>
+    </div>
+  </section>
+
+  <!-- ============ 分頁二：隨堂練習 ============ -->
+  <section class="panel" id="panel-quiz">
+    <div class="card">
+      <p class="no-print note">先作答，再按「對答案」，每題會出現解析。可以回到「融化實驗室」把情境做出來驗證。</p>
+      <div id="quiz-area"></div>
+      <div class="no-print">
+        <button class="btn" onclick="gradeQuiz()">對答案</button>
+        <button class="btn secondary" onclick="shuffleQuiz()">換順序（洗牌）</button>
+        <button class="btn secondary" onclick="window.print()">🖨 列印卷子</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =====================================================================
+   物理模型（單位：g、cm、cm³、gw）
+   ===================================================================== */
+const A = 50;          // 燒杯截面積 cm²
+const VL0 = 400;       // 原有液體體積 cm³
+const M0 = 100;        // 冰的質量 g
+const RHO_ICE = 0.92;
+const RHO_W = 1.0;
+const BEAKER_H = 13;   // 燒杯高 cm
+
+const LIQ = {
+  water: { name: "純水",   rho: 1.00, mix: true,  label: "純水（ρ=1.00）" },
+  brine: { name: "濃鹽水", rho: 1.20, mix: true,  label: "濃鹽水（ρ=1.20）" },
+  oil:   { name: "煤油",   rho: 0.80, mix: false, label: "煤油（ρ=0.80，冰會沉）" },
+};
+const INC = {
+  none:  { name: "純冰",       short: "無",   m: 0,  v: 0,  label: "純冰" },
+  stone: { name: "冰包石頭",   short: "石頭", m: 10, v: 4,  label: "包石頭（10 g，ρ=2.5）" },
+  wood:  { name: "冰包木塊",   short: "木塊", m: 9,  v: 15, label: "包木塊（9 g，ρ=0.6）" },
+  air:   { name: "冰包氣泡",   short: "氣泡", m: 0,  v: 10, label: "包氣泡（10 cm³，幾乎沒質量）" },
+};
+
+// 給定液體、夾帶物、融化比例 phi（0～1），算出所有數值
+function compute(liqKey, incKey, phi) {
+  const L = LIQ[liqKey], I = INC[incKey];
+  const mIce = M0 * (1 - phi);
+  const vIce = mIce / RHO_ICE;
+  const mMelt = M0 * phi;
+  const vMelt = mMelt / RHO_W;
+  // 氣泡在冰完全融化時跑掉
+  const incGone = incKey === "air" && phi >= 1;
+  const incM = incGone ? 0 : I.m;
+  const incV = incGone ? 0 : I.v;
+  const mc = mIce + incM;              // 物體（冰＋夾帶物）質量
+  const vc = vIce + incV;              // 物體體積
+  const rhoC = vc > 0 ? mc / vc : 0;
+  const s = Math.cbrt(vc);             // 畫成正立方體的邊長
+  const r = { phi, mIce, vIce, mMelt, vMelt, mc, vc, rhoC, s, incM, incV, incGone };
+
+  if (L.mix) {
+    const mLiq = VL0 * L.rho + mMelt;
+    const vLiq = VL0 + vMelt;
+    const rhoL = mLiq / vLiq;
+    r.rhoL = rhoL; r.vLiq = vLiq;
+    if (vc <= 0) { r.state = "none"; r.vSub = 0; r.B = 0; }
+    else if (rhoC < rhoL) { r.state = "float"; r.vSub = mc / rhoL; r.B = mc; }
+    else { r.state = "sink"; r.vSub = vc; r.B = rhoL * vc; }
+    r.H = (vLiq + r.vSub) / A;
+    r.hw = 0;
+    r.bottom = r.state === "float" ? r.H - r.vSub / (s * s) : 0;
+  } else {
+    // 煤油＋杯底的融水，兩層不混合
+    const rhoO = L.rho, vW = vMelt;
+    r.rhoL = rhoO; r.vLiq = VL0 + vW;
+    const s2 = s * s;
+    if (vc <= 0) { r.state = "none"; r.vSub = 0; r.B = 0; r.hw = vW / A; r.bottom = 0; }
+    else if (rhoC < rhoO) {
+      r.state = "float"; r.vSub = mc / rhoO; r.B = mc; r.hw = vW / A;
+    } else {
+      r.vSub = vc;
+      const f = (rhoC - rhoO) / (RHO_W - rhoO);   // 懸在交界時，泡在水層的比例
+      if (rhoC <= RHO_W && vW >= f * s * (A - s2)) {
+        r.state = "interface";
+        r.hw = (vW + f * s2 * s) / A;
+        r.bottom = r.hw - f * s;
+        r.B = mc;
+      } else {
+        r.state = "sink";
+        r.bottom = 0;
+        r.hw = vW <= (A - s2) * s ? vW / (A - s2) : (vW + s2 * s) / A;
+        const inW = Math.min(r.hw, s);
+        r.B = rhoO * (vc - s2 * inW) + RHO_W * s2 * inW;
+      }
+    }
+    r.H = (r.vLiq + r.vSub) / A;
+    if (r.state === "float") r.bottom = r.H - r.vSub / s2;
+  }
+  r.N = Math.max(0, r.mc - r.B);
+  return r;
+}
+
+/* =====================================================================
+   狀態與畫面
+   ===================================================================== */
+const STORE_KEY = "ice-melt-lab-v1";
+const saveProgress = (obj) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(obj)); } catch {} };
+const loadProgress = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
+
+const saved = loadProgress();
+let liq = LIQ[saved.liq] ? saved.liq : "water";
+let inc = INC[saved.inc] ? saved.inc : "none";
+let phi = 0;
+let prediction = null;
+let playing = false;
+
+const PRESETS = { 甲: ["water", "none"], 乙: ["water", "stone"], 丙: ["brine", "none"] };
+
+const $ = (id) => document.getElementById(id);
+const fmt = (x, d = 1) => (Math.abs(x) < 0.5 * Math.pow(10, -d) ? 0 : x).toFixed(d);
+const signed = (x, d = 2) => { const v = +fmt(x, d); return (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(d); };
+
+function buildSeg(rowId, dict, getter, setter) {
+  const row = $(rowId);
+  Object.entries(dict).forEach(([k, o]) => {
+    const b = document.createElement("button");
+    b.textContent = o.label; b.dataset.k = k;
+    b.onclick = () => { setter(k); scenarioChanged(); };
+    row.appendChild(b);
+  });
+}
+buildSeg("liqRow", LIQ, () => liq, (k) => (liq = k));
+buildSeg("incRow", INC, () => inc, (k) => (inc = k));
+document.querySelectorAll("#presetRow button").forEach((b) => {
+  b.onclick = () => { [liq, inc] = PRESETS[b.dataset.preset]; scenarioChanged(); };
+});
+
+function scenarioChanged() {
+  stopPlay();
+  phi = 0; $("melt").value = 0;
+  prediction = null;
+  saveProgress({ ...loadProgress(), liq, inc });
+  render();
+}
+
+function syncButtons() {
+  document.querySelectorAll("#liqRow button").forEach((b) => b.classList.toggle("on", b.dataset.k === liq));
+  document.querySelectorAll("#incRow button").forEach((b) => b.classList.toggle("on", b.dataset.k === inc));
+  document.querySelectorAll("#presetRow button").forEach((b) => {
+    const [l, i] = PRESETS[b.dataset.preset];
+    b.classList.toggle("on", l === liq && i === inc);
+  });
+  document.querySelectorAll("#predictRow button").forEach((b) => b.classList.toggle("on", prediction !== null && +b.dataset.p === prediction));
+}
+
+/* ---------- 燒杯 SVG ---------- */
+const PX = 36;                         // 1 cm = 36 px
+const BW = Math.sqrt(A) * PX;          // 燒杯內寬（方形截面）
+const BX = 70, BY0 = 515;              // 燒杯左緣、杯底 y
+const yOf = (cm) => BY0 - cm * PX;
+const NS = "http://www.w3.org/2000/svg";
+
+function liquidColor(r, liq) {
+  if (liq === "brine") {
+    const t = Math.max(0, Math.min(1, (r.rhoL - 1) / 0.2));   // 越鹹越深
+    return `rgba(${Math.round(66 - 40 * t)},${Math.round(165 - 60 * t)},${Math.round(245 - 70 * t)},${0.42 + 0.2 * t})`;
+  }
+  if (liq === "oil") return "rgba(255,193,7,.42)";
+  return "rgba(66,165,245,.42)";
+}
+
+// liq、inc 參數刻意和全域同名：同一支函式可以畫實驗室的杯子，也可以畫並排比較的三杯
+function drawBeaker(svg, r, r0, liq, inc) {
+  const cx = BX + BW / 2;
+  const L = [];
+  L.push(`<defs>
+    <pattern id="hatch-${svg.id}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#D84315" stroke-width="2.2" opacity=".55"/></pattern>
+  </defs>`);
+  // 刻度
+  for (let cm = 0; cm <= 12; cm++) {
+    const y = yOf(cm);
+    L.push(`<line x1="${BX - 10}" y1="${y}" x2="${BX}" y2="${y}" stroke="#90A4AE" stroke-width="1"/>`);
+    if (cm % 2 === 0) L.push(`<text x="${BX - 14}" y="${y + 4}" font-size="12" text-anchor="end" fill="#78909C">${cm}</text>`);
+  }
+  L.push(`<text x="${BX - 14}" y="${yOf(12) - 14}" font-size="12" text-anchor="end" fill="#78909C">cm</text>`);
+  // 液體
+  if (liq === "oil") {
+    L.push(`<rect x="${BX}" y="${yOf(r.H)}" width="${BW}" height="${(r.H - r.hw) * PX}" fill="${liquidColor(r, liq)}"/>`);
+    if (r.hw > 0) L.push(`<rect x="${BX}" y="${yOf(r.hw)}" width="${BW}" height="${r.hw * PX}" fill="rgba(66,165,245,.5)"/>`);
+    if (r.hw * PX > 14) L.push(`<text x="${BX + 8}" y="${yOf(r.hw / 2) + 5}" font-size="13" fill="#0D47A1">融水</text>`);
+    L.push(`<text x="${BX + BW - 8}" y="${yOf(r.H) + 20}" font-size="13" text-anchor="end" fill="#8D6E00">煤油</text>`);
+  } else {
+    L.push(`<rect x="${BX}" y="${yOf(r.H)}" width="${BW}" height="${r.H * PX}" fill="${liquidColor(r, liq)}"/>`);
+    L.push(`<text x="${BX + 8}" y="${yOf(r.H) + 20}" font-size="13" fill="#0D47A1">${LIQ[liq].name}${r.phi > 0 && liq === "brine" ? "（變淡中）" : ""}</text>`);
+  }
+  // 冰塊＋夾帶物
+  if (r.vc > 0) {
+    const side = r.s * PX;
+    const x = cx - side / 2, yTop = yOf(r.bottom + r.s), yBot = yOf(r.bottom);
+    if (r.vIce > 0.0001) {
+      L.push(`<rect x="${x}" y="${yTop}" width="${side}" height="${side}" rx="${Math.min(8, side / 6)}" fill="rgba(232,248,255,.88)" stroke="#4FC3F7" stroke-width="2"/>`);
+    }
+    // 夾帶物畫在中間
+    if (r.incV > 0) {
+      const d = Math.cbrt(r.incV) * PX;
+      const icy = yOf(r.bottom + r.s / 2);
+      if (inc === "stone") L.push(`<path d="M${cx - d / 2},${icy} q${d * .1},-${d * .55} ${d * .55},-${d * .5} q${d * .5},${d * .05} ${d * .45},${d * .5} q-${d * .05},${d * .5} -${d * .5},${d * .48} q-${d * .45},-${d * .02} -${d * .5},-${d * .48}z" fill="#78909C" stroke="#455A64" stroke-width="1.5"/>`);
+      if (inc === "wood")  L.push(`<rect x="${cx - d / 2}" y="${icy - d / 2}" width="${d}" height="${d}" rx="3" fill="#A1887F" stroke="#5D4037" stroke-width="1.5"/>`);
+      if (inc === "air")   L.push(`<circle cx="${cx}" cy="${icy}" r="${d * 0.62}" fill="rgba(255,255,255,.95)" stroke="#90A4AE" stroke-width="1.5"/>`);
+    }
+    // 排開體積：泡在液面下的部分
+    const subTop = Math.min(r.bottom + r.s, r.H);
+    if (subTop > r.bottom) {
+      L.push(`<rect x="${x}" y="${yOf(subTop)}" width="${side}" height="${(subTop - r.bottom) * PX}" fill="url(#hatch-${svg.id})" stroke="#D84315" stroke-width="1.5" stroke-dasharray="5 3"/>`);
+    }
+    if (r.state === "sink" && r.N > 0.01) {
+      L.push(`<text x="${cx}" y="${BY0 + 20}" font-size="14" font-weight="bold" text-anchor="middle" fill="${getVar("--bad")}">↑ 杯底撐住 ${fmt(r.N)} gw</text>`);
+    }
+  }
+  // 起始液面（虛線）與現在液面
+  L.push(`<line x1="${BX - 4}" y1="${yOf(r0.H)}" x2="${BX + BW + 4}" y2="${yOf(r0.H)}" stroke="#37474F" stroke-width="1.5" stroke-dasharray="6 4"/>`);
+  L.push(`<line x1="${BX}" y1="${yOf(r.H)}" x2="${BX + BW}" y2="${yOf(r.H)}" stroke="#0D47A1" stroke-width="2.5"/>`);
+  L.push(`<text x="${BX + BW + 8}" y="${yOf(r0.H) - 6}" font-size="12" fill="#37474F">起始液面</text>`);
+  // 燒杯外框
+  L.push(`<path d="M${BX},${yOf(BEAKER_H)} V${BY0} H${BX + BW} V${yOf(BEAKER_H)}" fill="none" stroke="#455A64" stroke-width="4" stroke-linejoin="round"/>`);
+  svg.innerHTML = L.join("");
+}
+
+/* ---------- 液面放大鏡 ---------- */
+function drawGauge(svg, r, r0, liq) {
+  const dmm = (r.H - r0.H) * 10;
+  const cy = 260;
+  const pxPerMm = 26;        // 燒杯上 1 mm 只有 3.6 px，這裡放大成 26 px
+  const L = [];
+  L.push(`<text x="64" y="22" font-size="14" text-anchor="middle" font-weight="bold" fill="#37474F">液面放大鏡</text>`);
+  L.push(`<rect x="34" y="40" width="60" height="440" rx="6" fill="#ECEFF1" stroke="#B0BEC5"/>`);
+  const top = Math.max(40, Math.min(480, cy - dmm * pxPerMm));
+  L.push(`<rect x="35" y="${top}" width="58" height="${479 - top}" fill="${liquidColor(r, liq)}"/>`);
+  for (let mm = -8; mm <= 8; mm++) {
+    const y = cy - mm * pxPerMm;
+    if (y < 42 || y > 478) continue;
+    L.push(`<line x1="${mm % 2 === 0 ? 24 : 28}" y1="${y}" x2="34" y2="${y}" stroke="#78909C"/>`);
+    if (mm % 2 === 0) L.push(`<text x="20" y="${y + 4}" font-size="11" text-anchor="end" fill="#78909C">${mm > 0 ? "+" : ""}${mm}</text>`);
+  }
+  L.push(`<line x1="30" y1="${cy}" x2="98" y2="${cy}" stroke="#37474F" stroke-width="1.5" stroke-dasharray="5 3"/>`);
+  L.push(`<line x1="34" y1="${top}" x2="94" y2="${top}" stroke="#0D47A1" stroke-width="3"/>`);
+  L.push(`<text x="64" y="500" font-size="11" text-anchor="middle" fill="#78909C">單位：mm</text>`);
+  const cls = Math.abs(dmm) < 0.005 ? "#2E7D32" : dmm > 0 ? "#C62828" : "#1565C0";
+  L.push(`<text x="64" y="528" font-size="17" text-anchor="middle" font-weight="bold" fill="${cls}" class="gauge-val">${signed(dmm)} mm</text>`);
+  svg.innerHTML = L.join("");
+}
+
+/* ---------- 曲線圖 ---------- */
+function drawCurve(r0) {
+  const svg = $("curve");
+  const W = 520, H = 220, l = 54, rt = 12, t = 12, b = 34;
+  const pts = [];
+  for (let i = 0; i <= 200; i++) { const p = i / 200; pts.push([p, (compute(liq, inc, p).H - r0.H) * 10]); }
+  const ys = pts.map((p) => p[1]);
+  let lo = Math.min(-1, ...ys), hi = Math.max(1, ...ys);
+  lo = Math.floor(lo); hi = Math.ceil(hi);
+  const X = (p) => l + p * (W - l - rt);
+  const Y = (v) => t + (hi - v) / (hi - lo) * (H - t - b);
+  const L = [];
+  for (let v = lo; v <= hi; v++) {
+    L.push(`<line x1="${l}" y1="${Y(v)}" x2="${W - rt}" y2="${Y(v)}" stroke="${v === 0 ? "#90A4AE" : "#ECEFF1"}" stroke-width="${v === 0 ? 1.5 : 1}"/>`);
+    L.push(`<text x="${l - 6}" y="${Y(v) + 4}" font-size="12" text-anchor="end" fill="#78909C">${v > 0 ? "+" : ""}${v}</text>`);
+  }
+  for (let p = 0; p <= 1.001; p += 0.25) L.push(`<text x="${X(p)}" y="${H - 14}" font-size="12" text-anchor="middle" fill="#78909C">${Math.round(p * 100)}%</text>`);
+  L.push(`<text x="${(l + W) / 2}" y="${H - 1}" font-size="12" text-anchor="middle" fill="#607D8B">融化程度</text>`);
+  L.push(`<text x="12" y="${H / 2}" font-size="12" text-anchor="middle" fill="#607D8B" transform="rotate(-90 12 ${H / 2})">Δh（mm）</text>`);
+  const done = pts.filter((p) => p[0] <= phi + 1e-9);
+  L.push(`<polyline points="${pts.map((p) => `${X(p[0])},${Y(p[1])}`).join(" ")}" fill="none" stroke="#CFD8DC" stroke-width="2.5" stroke-dasharray="4 4"/>`);
+  if (done.length > 1) L.push(`<polyline points="${done.map((p) => `${X(p[0])},${Y(p[1])}`).join(" ")}" fill="none" stroke="${getVar("--primary")}" stroke-width="3"/>`);
+  const cur = (compute(liq, inc, phi).H - r0.H) * 10;
+  L.push(`<circle cx="${X(phi)}" cy="${Y(cur)}" r="6" fill="${getVar("--accent")}" stroke="#fff" stroke-width="2"/>`);
+  svg.innerHTML = L.join("");
+}
+
+function getVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+/* ---------- 數值面板與帳本 ---------- */
+const STATE_TEXT = {
+  float: ["漂浮", ""], sink: ["沉在杯底", "sink"], interface: ["懸在油水交界", "mid"], none: ["冰已全部融化", "mid"],
+};
+
+function renderNums(r, r0) {
+  const L = LIQ[liq], I = INC[inc];
+  const dmm = (r.H - r0.H) * 10;
+  const dCls = Math.abs(dmm) < 0.005 ? "same" : dmm > 0 ? "up" : "down";
+  const rows = [];
+  rows.push(["冰剩下的質量 m冰", `${fmt(r.mIce)} g`, `體積 ${fmt(r.vIce)} cm³（m冰 ÷ 0.92）`]);
+  if (inc !== "none") rows.push([`夾帶物：${I.short}`, r.incGone ? "已逸出" : `${fmt(r.incM)} g／${fmt(r.incV)} cm³`, inc === "air" ? "空氣質量小到可以忽略" : ""]);
+  rows.push(["物體總重 W", `${fmt(r.mc)} gw`, "冰＋夾帶物"]);
+  rows.push([liq === "oil" ? "液體密度（上層煤油）" : "液體密度 ρ液", `${fmt(r.rhoL, 3)} g/cm³`, L.mix && r.phi > 0 && liq === "brine" ? "融水混進來，鹽水變淡" : (liq === "oil" ? "杯底融水 ρ=1.00，不和油混合" : "")]);
+  rows.push(["物體狀態", STATE_TEXT[r.state][0], r.vc > 0 ? `物體平均密度 ${fmt(r.rhoC, 3)} g/cm³` : ""]);
+  rows.push(["浮力 B", `${fmt(r.B)} gw`, r.state === "float" ? "漂浮：B = W" : r.state === "interface" ? "油和水一起往上推：B = W" : r.state === "sink" ? "沉底：B < W" : ""]);
+  if (r.state === "sink") rows.push(["杯底支撐力 N", `${fmt(r.N)} gw`, "N = W − B，杯底幫忙撐住的部分"]);
+  rows.push(["排開液體體積 V排", `${fmt(r.vSub)} cm³`, r.state === "float" ? "V排 = W ÷ ρ液" : r.vc > 0 ? "整個泡在液體裡：V排 = 物體體積" : "", "key"]);
+  rows.push(["已融化的水", `${fmt(r.mMelt)} g／${fmt(r.vMelt)} cm³`, "水 1 g 佔 1 cm³", "key"]);
+  rows.push(["液面高度 H", `${fmt(r.H, 3)} cm`, "H =（液體體積 + V排）÷ 50"]);
+  $("nums").innerHTML = rows.map(([k, v, h, cls]) =>
+    `<tr class="${cls || ""}"><td>${k}${h ? `<span class="hint">${h}</span>` : ""}</td><td class="v">${v}</td></tr>`).join("") +
+    `<tr><td>液面變化 Δh<span class="hint">跟起始液面比</span></td><td class="v"><span class="big ${dCls}">${signed(dmm)} mm</span></td></tr>`;
+
+  // 帳本
+  const give = r0.vSub - r.vSub, fill = r.vMelt, net = fill - give;
+  const maxV = Math.max(120, r0.vSub);
+  $("barGive").style.width = Math.max(0, give / maxV * 100) + "%";
+  $("barFill").style.width = Math.max(0, fill / maxV * 100) + "%";
+  $("valGive").textContent = fmt(give) + " cm³";
+  $("valFill").textContent = fmt(fill) + " cm³";
+  $("ledgerEq").innerHTML =
+    `液面多出的體積 ＝ ② − ① ＝ <b class="ledger-val">${fmt(fill)} − ${fmt(give)} = ${signed(net, 1)} cm³</b><br>` +
+    `Δh ＝ ${signed(net, 1)} cm³ ÷ 50 cm² ＝ <b class="ledger-val ${dCls}">${signed(dmm)} mm</b>`;
+
+  // 文字解說
+  const ex = $("explain");
+  ex.classList.toggle("warn", r.state === "sink" || (r.phi >= 1 && Math.abs(dmm) > 0.005));
+  ex.innerHTML = explainText(r, r0, dmm);
+}
+
+function explainText(r, r0, dmm) {
+  const L = LIQ[liq];
+  if (r.phi === 0) {
+    if (r.state === "float") return `還沒融化。物體漂浮，浮力＝重量 ${fmt(r.mc)} gw。<br>所以它排開的${L.name}重量也是 ${fmt(r.mc)} gw，體積 V排 ＝ ${fmt(r.mc)} ÷ ${fmt(r.rhoL, 2)} ＝ <b>${fmt(r.vSub)} cm³</b>。<br>拉動滑桿，比較 ① 讓出的空間 和 ② 補進來的水。`;
+    return `還沒融化。冰比${L.name}重（${fmt(r.rhoC, 3)} > ${fmt(r.rhoL, 2)}），所以沉下去、整塊泡在液體裡。<br>這時 V排 就等於冰塊自己的體積 <b>${fmt(r.vSub)} cm³</b>，不再是「重量 ÷ 密度」。`;
+  }
+  if (r.phi < 1) {
+    if (r.state === "float" && liq === "water")
+      return `冰融掉 ${fmt(r.mMelt)} g，V排 就少 ${fmt(r0.vSub - r.vSub)} cm³；融出的水剛好也是 ${fmt(r.vMelt)} cm³。<br>水的「讓出」和「補進」<b>一樣多</b>，所以液面不動。`;
+    if (r.state === "float" && liq === "oil")
+      return `冰幾乎融光，剩下的物體比煤油輕，浮上油面了。<br>漂浮時 V排 ＝ 重量 ÷ ρ油，比整塊泡著時小 → 液面又往下一點。`;
+    if (r.state === "float")
+      return `冰融掉 ${fmt(r.mMelt)} g，排開的${L.name}少了 ${fmt(r0.vSub - r.vSub)} cm³，可是融出的淡水有 ${fmt(r.vMelt)} cm³。<br>${L.name}比水重，同樣的重量，淡水要佔<b>更大</b>的體積 → 補進來的比讓出的多 → 液面上升。`;
+    if (r.state === "sink" && inc === "stone" && liq === "water")
+      return `冰變小，撐不住石頭，整塊沉到杯底了！<br>現在杯底幫忙撐住 ${fmt(r.N)} gw，浮力不必等於重量，所以排開的水變少 → 液面開始下降。`;
+    if (r.state === "sink")
+      return `物體沉在杯底，V排 ＝ 物體體積。<br>冰融掉 ${fmt(r.mMelt)} g，讓出 ${fmt(r0.vSub - r.vSub)} cm³，但融成水只有 ${fmt(r.vMelt)} cm³（冰比水「蓬鬆」）→ 液面下降。`;
+    if (r.state === "interface")
+      return `物體比煤油重、比水輕，所以浮在杯底融水和煤油的交界，整塊仍泡在液體裡。<br>V排 仍等於物體體積，液面變化只看「冰縮成水」少掉的體積。`;
+  }
+  // 全部融化
+  const word = Math.abs(dmm) < 0.005 ? "不變" : dmm > 0 ? "上升" : "下降";
+  let why = "";
+  if (liq === "water" && inc === "none") why = "冰浮著時排開的水，重量正好等於冰的重量；融化後變成同樣重量的水，剛好填回那個空間。";
+  else if (liq === "water" && inc === "stone") why = "石頭原本靠冰「載著」，排開 10 cm³ 的水（重量＝石頭 10 gw）。沉底後只佔自己的 4 cm³，少掉 6 cm³。";
+  else if (liq === "water" && inc === "wood") why = "木塊融完後仍然浮著，排開的水重量還是 9 gw，跟原本被冰載著時一樣。";
+  else if (liq === "water" && inc === "air") why = "空氣幾乎沒有重量，浮力只負責撐冰，所以跟純冰一樣。";
+  else if (liq === "brine") why = "冰排開的是比較重的鹽水，體積較小；融成的淡水比較輕，體積較大，所以多出來。" +
+    (inc === "stone" ? "（石頭沉底會讓液面少升一點，但鹽水效應比較大。）" : "");
+  else if (liq === "oil") why = "冰沉底時本來就整塊泡著，V排 ＝ 冰的體積；融成水後體積變小（ρ冰 0.92 < ρ水 1.00）。" +
+    (inc === "air" ? "氣泡原本也泡在油裡佔空間，融化後跑掉了，所以降更多。" : inc === "wood" ? "木塊最後浮上油面，只泡一部分，所以降更多。" : "");
+  return `<b>全部融化：液面${word}（${signed(dmm)} mm）。</b><br>${why}`;
+}
+
+/* ---------- 預測 ---------- */
+document.querySelectorAll("#predictRow button").forEach((b) => {
+  b.onclick = () => { prediction = +b.dataset.p; render(); };
+});
+function renderPredict(r0) {
+  const out = $("predictResult");
+  if (prediction === null) { out.textContent = ""; return; }
+  if (phi < 1) { out.textContent = "已記下你的預測，把冰融完看看！"; out.style.color = "#5E35B1"; return; }
+  const d = (compute(liq, inc, 1).H - r0.H) * 10;
+  const truth = Math.abs(d) < 0.005 ? 0 : Math.sign(d);
+  out.textContent = truth === prediction ? "✔ 預測正確！" : "✘ 跟預測不一樣，看看體積帳本找原因";
+  out.style.color = truth === prediction ? getVar("--ok") : getVar("--bad");
+}
+
+/* ---------- 總繪製 ---------- */
+function render() {
+  const r0 = compute(liq, inc, 0);
+  const r = compute(liq, inc, phi);
+  syncButtons();
+  $("pct").textContent = Math.round(phi * 100) + "%";
+  const [txt, cls] = STATE_TEXT[r.state];
+  const tag = $("stateTag");
+  tag.textContent = r.state === "float" && liq === "oil" ? "浮在油面" : txt;
+  tag.className = "state-tag " + cls;
+  drawBeaker($("beaker"), r, r0, liq, inc);
+  drawGauge($("gauge"), r, r0, liq);
+  drawCurve(r0);
+  renderNums(r, r0);
+  renderPredict(r0);
+  drawBlocks($("blocks"), liq, inc);
+  $("blocksText").innerHTML = blocksExplain(liq, inc);
+}
+
+/* ---------- 同重量水塊對照：融化前排開的 A vs 融化後佔掉的 B ---------- */
+function blockNumbers(lk, ik) {
+  const r0 = compute(lk, ik, 0), r1 = compute(lk, ik, 1);
+  const A = r0.vSub, melt = r1.vMelt, incSub = r1.vSub;
+  return { r0, r1, A, melt, incSub, B: melt + incSub, d: melt + incSub - A };
+}
+
+function drawBlocks(svg, lk, ik) {
+  const { r0, r1, A, melt, incSub, B, d } = blockNumbers(lk, ik);
+  const k = 1.5, base = 240, w = 110, xa = 50, xb = 230;
+  const yA = base - A * k, yM = base - melt * k, yB = base - B * k;
+  const L = [];
+  const head = Math.abs(d) < 0.05 ? ["A ＝ B → 液面不變", "#2E7D32"]
+    : d > 0 ? [`B 比 A 多 ${fmt(d)} cm³ → 液面上升`, "#C62828"]
+    : [`B 比 A 少 ${fmt(-d)} cm³ → 液面下降`, "#1565C0"];
+  L.push(`<text x="200" y="22" font-size="18" font-weight="bold" text-anchor="middle" fill="${head[1]}" class="blk-num">${head[0]}</text>`);
+  // A：融化前排開的液體
+  L.push(`<rect x="${xa}" y="${yA}" width="${w}" height="${A * k}" fill="${liquidColor(r0, lk)}" stroke="#37474F" stroke-width="2" stroke-dasharray="6 4"/>`);
+  L.push(`<text x="${xa + w / 2}" y="${yA + A * k / 2}" font-size="16" font-weight="bold" text-anchor="middle" fill="#1F2933" class="blk-num">${fmt(A)} cm³</text>`);
+  L.push(`<text x="${xa + w / 2}" y="${yA + A * k / 2 + 20}" font-size="13" text-anchor="middle" fill="#37474F" class="blk-num">${r0.state === "float" ? `重 ${fmt(r0.mc)} gw` : "＝冰的體積"}</text>`);
+  // B：融化後的水＋夾帶物最後佔的
+  L.push(`<rect x="${xb}" y="${yM}" width="${w}" height="${melt * k}" fill="rgba(66,165,245,.55)" stroke="#1565C0" stroke-width="2"/>`);
+  L.push(`<text x="${xb + w / 2}" y="${yM + melt * k / 2}" font-size="16" font-weight="bold" text-anchor="middle" fill="#0D47A1" class="blk-num">${fmt(melt)} cm³</text>`);
+  L.push(`<text x="${xb + w / 2}" y="${yM + melt * k / 2 + 20}" font-size="13" text-anchor="middle" fill="#0D47A1" class="blk-num">融水 重 ${fmt(r1.mMelt)} gw</text>`);
+  if (incSub > 0.01) {
+    L.push(`<rect x="${xb}" y="${yB}" width="${w}" height="${incSub * k}" fill="${ik === "stone" ? "#78909C" : "#A1887F"}" stroke="#455A64" stroke-width="1.5"/>`);
+    L.push(`<text x="${xb + w + 6}" y="${yB + incSub * k / 2 + 4}" font-size="12" fill="#455A64" class="blk-num">+${INC[ik].short}${fmt(incSub)}</text>`);
+  }
+  // A 的頂端畫一條基準線，B 超過或不到一看就知道
+  L.push(`<line x1="${xa - 6}" y1="${yA}" x2="${xb + w + 6}" y2="${yA}" stroke="#E65100" stroke-width="2" stroke-dasharray="5 4"/>`);
+  L.push(`<line x1="20" y1="${base}" x2="380" y2="${base}" stroke="#90A4AE" stroke-width="1.5"/>`);
+  const liqName = LIQ[lk].name;
+  L.push(`<text x="${xa + w / 2}" y="${base + 22}" font-size="14" font-weight="bold" text-anchor="middle" fill="#37474F">A 融化前</text>`);
+  L.push(`<text x="${xa + w / 2}" y="${base + 40}" font-size="12" text-anchor="middle" fill="#607D8B">冰排開的${liqName}</text>`);
+  L.push(`<text x="${xb + w / 2}" y="${base + 22}" font-size="14" font-weight="bold" text-anchor="middle" fill="#37474F">B 融化後</text>`);
+  L.push(`<text x="${xb + w / 2}" y="${base + 40}" font-size="12" text-anchor="middle" fill="#607D8B">融水${incSub > 0.01 ? "＋" + INC[ik].short + "排開的" : ""}</text>`);
+  svg.innerHTML = L.join("");
+}
+
+function blocksExplain(lk, ik) {
+  const { r0, A, melt, incSub, d } = blockNumbers(lk, ik);
+  const L = LIQ[lk], I = INC[ik];
+  const aText = r0.state === "float"
+    ? `<b>A</b>：冰${ik === "none" ? "" : "（連同" + I.short + "）"}浮著，浮力＝重量 ${fmt(r0.mc)} gw，所以排開的${L.name}也重 ${fmt(r0.mc)} gw。<br>　A ＝ ${fmt(r0.mc)} ÷ ${fmt(r0.rhoL, 2)} ＝ ${fmt(A)} cm³。`
+    : `<b>A</b>：冰比${L.name}重，沉到杯底整塊泡著，A 就是冰${ik === "none" ? "" : "（含" + I.short + "）"}自己的體積 ${fmt(A)} cm³。`;
+  let bText = `<b>B</b>：100 g 的冰融成 100 g 的水，水 1 g 佔 1 cm³，所以是 ${fmt(melt)} cm³`;
+  if (ik === "stone") bText += `；石頭沉底只佔自己的 ${fmt(incSub)} cm³`;
+  else if (ik === "wood") bText += `；木塊還浮著，排開 ${fmt(incSub)} cm³`;
+  else if (ik === "air") bText += `；氣泡跑掉了，不佔空間`;
+  bText += "。";
+  return `${aText}<br>${bText}<br><b>判斷：B 比 A 大 → 上升；一樣 → 不變；B 比 A 小 → 下降。</b>`;
+}
+
+/* ---------- 控制 ---------- */
+$("melt").addEventListener("input", (e) => { stopPlay(); phi = e.target.value / 1000; render(); });
+$("resetBtn").onclick = () => { stopPlay(); phi = 0; $("melt").value = 0; render(); };
+$("hideNums").onchange = (e) => $("panel-lab").classList.toggle("hidden-nums", e.target.checked);
+$("playBtn").onclick = () => (playing ? stopPlay() : startPlay());
+
+let lastT = 0;
+function startPlay() {
+  if (phi >= 1) phi = 0;
+  playing = true; $("playBtn").textContent = "⏸ 暫停"; lastT = 0;
+  requestAnimationFrame(step);
+}
+function stopPlay() { playing = false; $("playBtn").textContent = "▶ 自動融化"; }
+function step(t) {
+  if (!playing) return;
+  if (lastT) phi = Math.min(1, phi + (t - lastT) / 10000);   // 10 秒融完
+  lastT = t;
+  $("melt").value = Math.round(phi * 1000);
+  render();
+  if (phi >= 1) { stopPlay(); return; }
+  requestAnimationFrame(step);
+}
+
+/* =====================================================================
+   甲乙丙並排：三杯共用一條融化滑桿
+   ===================================================================== */
+const CMP_DEFAULT = [{ l: "water", i: "none" }, { l: "water", i: "stone" }, { l: "brine", i: "none" }];
+const PRESET_NAME = { "water|none": "甲｜純冰浮在純水", "water|stone": "乙｜含石頭的冰浮在純水", "brine|none": "丙｜純冰浮在濃鹽水" };
+let cmpSet = (() => {
+  const s = loadProgress().cmp;
+  return Array.isArray(s) && s.length === 3 && s.every((c) => c && LIQ[c.l] && INC[c.i]) ? s : CMP_DEFAULT.map((c) => ({ ...c }));
+})();
+let phiC = 0, playingC = false, lastC = 0;
+const cmpPred = [null, null, null];
+
+const cmpTitle = (n) => PRESET_NAME[cmpSet[n].l + "|" + cmpSet[n].i] || `第 ${n + 1} 杯｜${INC[cmpSet[n].i].name}・${LIQ[cmpSet[n].l].name}`;
+const optionList = (dict) => Object.entries(dict).map(([k, o]) => `<option value="${k}">${o.label}</option>`).join("");
+
+function cmpChanged(n) {
+  cmpPred[n] = null;
+  saveProgress({ ...loadProgress(), cmp: cmpSet });
+  drawBlocks($("cmpK" + n), cmpSet[n].l, cmpSet[n].i);
+  renderCompare();
+}
+
+function buildCompare() {
+  $("cmpGrid").innerHTML = [0, 1, 2].map((n) => `
+    <div class="card cmp-card">
+      <h2><span id="cmpTitle${n}"></span> <span class="state-tag" id="cmpTag${n}"></span></h2>
+      <div class="row cmp-pick no-print">
+        <select id="cmpLiq${n}" aria-label="第 ${n + 1} 杯的液體">${optionList(LIQ)}</select>
+        <select id="cmpInc${n}" aria-label="第 ${n + 1} 杯的冰塊">${optionList(INC)}</select>
+      </div>
+      <div class="row seg predict" data-n="${n}">
+        <span>預測：</span><button data-p="1">上升</button><button data-p="0">不變</button><button data-p="-1">下降</button>
+        <span class="cmp-res" id="cmpRes${n}"></span>
+      </div>
+      <div class="stage-wrap">
+        <svg id="cmpB${n}" class="beaker-svg" viewBox="0 0 400 540" role="img" aria-label="第 ${n + 1} 杯"></svg>
+        <svg id="cmpG${n}" class="gauge-svg" viewBox="0 0 128 540" role="img" aria-label="第 ${n + 1} 杯液面放大鏡"></svg>
+      </div>
+      <div class="ledger" id="cmpL${n}"></div>
+      <svg id="cmpK${n}" viewBox="0 0 400 290" style="width:100%;height:auto" role="img" aria-label="第 ${n + 1} 杯融化前後體積比較"></svg>
+    </div>`).join("");
+  document.querySelectorAll("#cmpGrid .predict").forEach((row) => {
+    row.querySelectorAll("button").forEach((b) => {
+      b.onclick = () => { cmpPred[+row.dataset.n] = +b.dataset.p; renderCompare(); };
+    });
+  });
+  [0, 1, 2].forEach((n) => {
+    $("cmpLiq" + n).onchange = (e) => { cmpSet[n].l = e.target.value; cmpChanged(n); };
+    $("cmpInc" + n).onchange = (e) => { cmpSet[n].i = e.target.value; cmpChanged(n); };
+  });
+  cmpSet.forEach(({ l, i }, n) => drawBlocks($("cmpK" + n), l, i));
+}
+
+function renderCompare() {
+  $("cmpPct").textContent = Math.round(phiC * 100) + "%";
+  cmpSet.forEach(({ l, i }, n) => {
+    $("cmpTitle" + n).textContent = cmpTitle(n);
+    $("cmpLiq" + n).value = l;
+    $("cmpInc" + n).value = i;
+    const r0 = compute(l, i, 0), r = compute(l, i, phiC);
+    drawBeaker($("cmpB" + n), r, r0, l, i);
+    drawGauge($("cmpG" + n), r, r0, l);
+    const [txt, cls] = STATE_TEXT[r.state];
+    $("cmpTag" + n).textContent = txt;
+    $("cmpTag" + n).className = "state-tag " + cls;
+    const give = r0.vSub - r.vSub, fill = r.vMelt, dmm = (r.H - r0.H) * 10;
+    const dCls = Math.abs(dmm) < 0.005 ? "same" : dmm > 0 ? "up" : "down";
+    const maxV = 120;
+    $("cmpL" + n).innerHTML = `
+      <div class="bar-row"><span>① 讓出</span><div class="track"><div class="bar" style="width:${Math.max(0, give / maxV * 100)}%;background:var(--give)"></div></div><span class="ledger-val">${fmt(give)} cm³</span></div>
+      <div class="bar-row"><span>② 補進</span><div class="track"><div class="bar" style="width:${Math.max(0, fill / maxV * 100)}%;background:var(--fill)"></div></div><span class="ledger-val">${fmt(fill)} cm³</span></div>
+      <div class="cmp-dh">Δh ＝（② − ①）÷ 50 ＝ <b class="ledger-val ${dCls}">${signed(dmm)} mm</b></div>`;
+    document.querySelectorAll(`#cmpGrid .predict[data-n="${n}"] button`).forEach((b) =>
+      b.classList.toggle("on", cmpPred[n] !== null && +b.dataset.p === cmpPred[n]));
+    const res = $("cmpRes" + n);
+    if (cmpPred[n] === null || phiC < 1) res.textContent = "";
+    else {
+      const d = (compute(l, i, 1).H - r0.H) * 10;
+      const truth = Math.abs(d) < 0.005 ? 0 : Math.sign(d);
+      res.textContent = truth === cmpPred[n] ? "✔ 對" : "✘ 再想想";
+      res.style.color = truth === cmpPred[n] ? getVar("--ok") : getVar("--bad");
+    }
+  });
+}
+
+function startPlayC() {
+  if (phiC >= 1) phiC = 0;
+  playingC = true; $("cmpPlay").textContent = "⏸ 暫停"; lastC = 0;
+  requestAnimationFrame(stepC);
+}
+function stopPlayC() { playingC = false; $("cmpPlay").textContent = "▶ 三杯一起融化"; }
+function stepC(t) {
+  if (!playingC) return;
+  if (lastC) phiC = Math.min(1, phiC + (t - lastC) / 10000);
+  lastC = t;
+  $("cmpMelt").value = Math.round(phiC * 1000);
+  renderCompare();
+  if (phiC >= 1) { stopPlayC(); return; }
+  requestAnimationFrame(stepC);
+}
+$("cmpMelt").addEventListener("input", (e) => { stopPlayC(); phiC = e.target.value / 1000; renderCompare(); });
+$("cmpPlay").onclick = () => (playingC ? stopPlayC() : startPlayC());
+$("cmpReset").onclick = () => { stopPlayC(); phiC = 0; $("cmpMelt").value = 0; renderCompare(); };
+$("cmpDefault").onclick = () => {
+  cmpSet = CMP_DEFAULT.map((c) => ({ ...c }));
+  [0, 1, 2].forEach(cmpChanged);
+};
+$("cmpHide").onchange = (e) => $("panel-compare").classList.toggle("hidden-nums", e.target.checked);
+
+/* =====================================================================
+   學習單（答案由 compute() 算，改參數會自動跟著變）
+   ===================================================================== */
+function buildWorksheet() {
+  const ans = (s) => `<span class="ans">${s}</span>`;
+  const word = (l, i) => { const d = (compute(l, i, 1).H - compute(l, i, 0).H) * 10; return Math.abs(d) < 0.005 ? "不變" : d > 0 ? "上升" : "下降"; };
+  const P = [
+    ["甲", "純冰浮在純水", "water", "none", "排開的水重＝冰重；融成同樣重的水，剛好填回"],
+    ["乙", "含石頭的冰浮在純水", "water", "stone", "石頭沉底後只佔自己的體積，比原本替它排開的水少"],
+    ["丙", "純冰浮在濃鹽水", "brine", "none", "排開的是較重的鹽水、體積小；融成的淡水較輕、體積大"],
+    ["丁", "純冰沉在煤油裡", "oil", "none", "沉底時排開＝冰的體積；冰融成水，體積變小"],
+  ];
+  const steps = [0, 0.25, 0.5, 0.75, 1];
+  let sinkAt = 1;
+  for (let k = 0; k <= 1000; k++) if (compute("water", "stone", k / 1000).state === "sink") { sinkAt = k / 1000; break; }
+  const p0 = compute("water", "stone", 0);
+
+  $("ws").innerHTML = `
+    <h2>學習單｜冰塊融化，液面會怎樣？</h2>
+    <div class="ws-head"><span>班級：＿＿＿＿</span><span>座號：＿＿＿</span><span>姓名：＿＿＿＿＿＿</span></div>
+
+    <h3>一、先預測（還沒操作網頁前寫）</h3>
+    <table>
+      <tr><th style="width:30%">情境</th><th style="width:16%">液面會？<br>（上升／不變／下降）</th><th>我的理由</th></tr>
+      ${P.map(([k, t, l, i, why]) => `<tr><td class="l">${k}｜${t}</td><td>${ans(word(l, i))}</td><td class="l">${ans(why)}</td></tr>`).join("")}
+    </table>
+
+    <h3>二、記錄數值（到「融化實驗室」按「乙」，把滑桿拉到指定位置）</h3>
+    <table>
+      <tr><th>融化程度</th><th>物體狀態</th><th>V排<br>(cm³)</th><th>已融化的水<br>(cm³)</th><th>① 讓出<br>(cm³)</th><th>② 補進<br>(cm³)</th><th>Δh<br>(mm)</th></tr>
+      ${steps.map((p) => {
+        const r = compute("water", "stone", p);
+        return `<tr><td>${p * 100}%</td><td>${ans(STATE_TEXT[r.state][0])}</td><td>${ans(fmt(r.vSub))}</td><td>${ans(fmt(r.vMelt))}</td>
+          <td>${ans(fmt(p0.vSub - r.vSub))}</td><td>${ans(fmt(r.vMelt))}</td><td>${ans(signed((r.H - p0.H) * 10))}</td></tr>`;
+      }).join("")}
+    </table>
+    <p>1. 融化到哪裡之前，液面一直不變？為什麼？</p>
+    <div class="line">${ans(`約 ${Math.round(sinkAt * 100)}% 之前。冰和石頭一起浮著，浮力＝總重；冰融掉多少 g，V排 就少多少 cm³，融水剛好補回來（① ＝ ②）。`)}</div>
+    <p>2. 液面從什麼時候開始下降？那時候冰塊發生了什麼事？</p>
+    <div class="line">${ans(`約 ${Math.round(sinkAt * 100)}% 起。冰變小撐不住石頭，整塊沉到杯底；杯底幫忙撐住，浮力變小，排開的水變少（① > ②）。`)}</div>
+
+    <h3>三、比一比（到「甲乙丙並排」分頁看下方的 A、B 方塊）</h3>
+    <table>
+      <tr><th>情境</th><th>A 融化前排開的體積 (cm³)</th><th>B 融化後佔的體積 (cm³)</th><th>B − A (cm³)</th><th>液面</th></tr>
+      ${P.slice(0, 3).map(([k, , l, i]) => {
+        const b = blockNumbers(l, i);
+        return `<tr><td>${k}</td><td>${ans(fmt(b.A))}</td><td>${ans(fmt(b.B))}</td><td>${ans(signed(b.d, 1))}</td><td>${ans(word(l, i))}</td></tr>`;
+      }).join("")}
+    </table>
+
+    <h3>四、寫下你的判斷規則</h3>
+    <p>比較「＿＿＿＿＿＿＿＿＿＿」和「＿＿＿＿＿＿＿＿＿＿」，如果後者比較大，液面就＿＿＿＿。</p>
+    <div class="line">${ans("比較「冰浮著時排開的液體體積（A）」和「冰（及夾帶物）融化後所佔的體積（B）」；B 較大 → 上升，相等 → 不變，B 較小 → 下降。")}</div>
+    <p>挑戰：冰塊在煤油中會沉到杯底。全部融化後液面會怎樣？請用 A、B 說明。</p>
+    <div class="line">${ans(`下降。冰沉底，A ＝ 冰的體積 ${fmt(blockNumbers("oil", "none").A)} cm³；B ＝ 融成的水 ${fmt(blockNumbers("oil", "none").B)} cm³，B 比 A 小。`)}</div>
+    <div class="line"></div>`;
+}
+$("showAns").onchange = (e) => $("ws").classList.toggle("show-ans", e.target.checked);
+
+/* =====================================================================
+   隨堂練習（題庫＋列印，沿用模板）
+   ===================================================================== */
+const QUESTIONS = [
+  { stem: "1. 一塊純冰浮在純水上。冰<u>融化到一半</u>的時候，水面和一開始相比如何？",
+    options: ["上升", "不變", "下降", "要看冰塊形狀"], ans: 1,
+    exp: "漂浮時 V排 ＝ 冰重 ÷ ρ水。冰每融掉 1 g，V排 少 1 cm³，同時多出 1 cm³ 的水，讓出與補進一樣多，所以融化過程中任何時刻水面都不變。" },
+  { stem: "2. 冰塊裡凍著一根鐵釘，整塊浮在純水上。冰全部融化、鐵釘沉底後，水面如何變化？",
+    options: ["上升", "不變", "下降", "先升後降"], ans: 2,
+    exp: "鐵釘被冰載著時，靠排開「與鐵釘同重」的水撐住，體積是 m鐵 ÷ 1；沉底後只佔自己的體積 m鐵 ÷ 7.9，比較小，所以水面下降。" },
+  { stem: "3. 冰塊裡包著一小塊軟木（密度 0.6 g/cm³），浮在純水上。冰全部融化後軟木仍浮在水面，水面如何變化？",
+    options: ["上升", "不變", "下降", "無法判斷"], ans: 1,
+    exp: "融化前後，軟木都是漂浮，都排開「與軟木同重」的水，貢獻的 V排 沒變；冰的部分也和純冰一樣不變，所以水面不變。" },
+  { stem: "4. 冰塊放進煤油（密度 0.8 g/cm³）中會沉到杯底。冰全部融化後（融水沉在杯底，不與油混合），液面如何變化？",
+    options: ["上升", "不變", "下降", "先降後升"], ans: 2,
+    exp: "冰沉底時整塊泡在液體裡，V排 ＝ 冰的體積 ＝ m ÷ 0.92；融成水後體積 ＝ m ÷ 1.00，比較小，所以液面下降。" },
+  { stem: "5. 純冰浮在濃鹽水上，融化後液面上升。下列哪一個說明最正確？",
+    options: ["冰融化時吸熱，使鹽水膨脹", "冰排開的鹽水體積，比冰融化成的淡水體積小", "鹽會讓冰融化得比較快", "冰在鹽水中浮力比較小"], ans: 1,
+    exp: "冰排開的鹽水重量＝冰重，鹽水密度大所以體積小；融成的淡水同樣重，密度小所以體積大。補進來的比讓出的多，液面上升。" },
+  { stem: "6. 內含小石頭的冰浮在純水上。冰慢慢融化，但在冰和石頭<u>還一起浮著</u>的這段時間，水面如何變化？",
+    options: ["一直上升", "保持不變", "一直下降", "忽升忽降"], ans: 1,
+    exp: "只要整塊還浮著，浮力就等於冰＋石頭的總重。冰融掉多少 g，V排 就少多少 cm³，融水剛好補回來，所以水面不變；要等整塊沉底、杯底開始幫忙撐，水面才下降。可在實驗室選「純水＋包石頭」觀察曲線的平台。" },
+];
+
+let quizOrder = QUESTIONS.map((_, i) => i);
+function renderQuiz() {
+  $("quiz-area").innerHTML = quizOrder.map((qi, n) => {
+    const q = QUESTIONS[qi];
+    return `<div class="q" data-qi="${qi}">
+      <div class="stem">${q.stem}</div>
+      ${q.options.map((op, oi) => `<label><input type="radio" name="q${n}" value="${oi}"> (${"ABCD"[oi]}) ${op}</label>`).join("")}
+      <div class="exp">💡 ${q.exp}</div>
+    </div>`;
+  }).join("");
+}
+function gradeQuiz() {
+  document.querySelectorAll(".q").forEach((div) => {
+    const q = QUESTIONS[+div.dataset.qi];
+    const picked = div.querySelector("input:checked");
+    div.classList.remove("correct", "wrong");
+    if (picked) div.classList.add(+picked.value === q.ans ? "correct" : "wrong");
+  });
+}
+function shuffleQuiz() {
+  for (let i = quizOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [quizOrder[i], quizOrder[j]] = [quizOrder[j], quizOrder[i]];
+  }
+  renderQuiz();
+}
+
+/* ====== 分頁切換 ====== */
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    $("panel-" + b.dataset.tab).classList.add("active");
+  });
+});
+
+render();
+buildCompare();
+renderCompare();
+buildWorksheet();
+renderQuiz();
+</script>
+</body>
+</html>
